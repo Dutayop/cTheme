@@ -1,0 +1,47 @@
+bash -c '
+set -e
+cd /var/www/pterodactyl || { echo "❌ Pterodactyl not found"; exit 1; }
+
+echo "==[ STEP 1 ]== Prepare theme directory"
+mkdir -p public/themes
+
+echo "==[ STEP 2 ]== Fix Blade asset() syntax (SAFE)"
+FILE="resources/views/layouts/admin.blade.php"
+
+if [ -f "$FILE" ]; then
+  cp "$FILE" "$FILE.bak.$(date +%s)"
+
+  # Fix WRONG: asset(themes/xxx.css)
+  sed -i -E "s/asset\\((themes\\/[^)]+)\\)/asset(\"\\1\")/g" "$FILE"
+
+  # Ensure theme is included
+  if ! grep -q "noobee-admin.css" "$FILE"; then
+    sed -i "/<\/head>/i <link rel=\"stylesheet\" href=\"{{ asset('themes/noobee-admin.css') }}\">" "$FILE"
+  fi
+else
+  echo "❌ admin.blade.php not found"
+  exit 1
+fi
+
+echo "==[ STEP 3 ]== Clear Laravel cache (IMPORTANT)"
+php artisan view:clear || true
+php artisan optimize:clear || true
+php artisan config:clear || true
+php artisan route:clear || true
+rm -rf storage/framework/views/*
+
+echo "==[ STEP 4 ]== Install cTheme (temaAdmin.sh)"
+curl -fsSL https://raw.githubusercontent.com/Dutayop/cTheme/main/temaAdmin.sh | bash
+
+echo ""
+echo "=========================================="
+echo "✅ Blade FIXED"
+echo "✅ cTheme INSTALLED"
+echo "✅ Cache CLEARED"
+echo "=========================================="
+echo ""
+echo "⚠️ If UI not updated:"
+echo "• Hard refresh (CTRL+SHIFT+R)"
+echo "• Clear browser cache"
+echo ""
+'
